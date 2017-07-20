@@ -1,0 +1,207 @@
+#include <ESP8266WiFi.h>
+#include <WebSocketsServer.h>
+#include <ESP8266WebServer.h>
+
+//  *********************************************************
+const char* ssid="";             // wlan SSID
+const char* password=" ";     // PASSWORD                             
+int cekajmillis=25;                    // interval
+//  *********************************************************
+
+ESP8266WebServer server(80);
+WebSocketsServer webSocket=WebSocketsServer(88);
+String webstranica,javaScript,JSONsalji;
+unsigned long cekanje=0UL;
+
+boolean btn1=false, btn2=true, btn3=false, btn4=false;
+char prviref,prvichar,drugiref,drugichar,aj;
+
+
+void buildwebstranica(){
+  buildJavascript();
+  webstranica="<!DOCTYPE HTML><HTML>\n";
+  webstranica+="<META name='viewport' content='width=device-width, initial-scale=1'>\n";
+  webstranica+=javaScript;
+  webstranica+="<BODY>\n";
+  webstranica+="<B>  www.diy-audio.com.hr <BR>\n"; 
+  //webstranica+="CLICK<BR>\n";
+  webstranica+="<h2 style='-webkit-user-select: none;'>\n";
+  webstranica+="<BUTTON ID='button' ONCLICK='button()' STYLE='width:140px;height:40px'></BUTTON><BR><BR>\n";
+  webstranica+="<BUTTON ID='button1' ONCLICK='button1()' STYLE='width:140px;height:40px'></BUTTON><BR><BR>\n";
+  //webstranica+="HOLD<BR>\n";    
+  webstranica+="<BUTTON ID='button2' ONTOUCHSTART='button2()' ONTOUCHEND='button2up()' STYLE='width:140px;height:40px'></BUTTON><BR><BR>\n";
+  webstranica+="<BUTTON ID='button3' ONTOUCHSTART='button3()' ONTOUCHEND='button3up()' STYLE='width:140px;height:40px'></BUTTON></h2>\n";
+    
+  webstranica+="</BODY>\n";
+  webstranica+="</HTML>\n";
+}
+
+void buildJavascript(){
+  javaScript="<SCRIPT>\n";
+  javaScript+="InitWebSocket();\n";
+  javaScript+="function InitWebSocket(){\n";
+  javaScript+="  websock=new WebSocket('ws://'+window.location.hostname+':88/');\n";
+  javaScript+="  websock.onmessage=function(evt){\n";
+  javaScript+="    JSONobj=JSON.parse(evt.data);\n"; 
+  
+  javaScript+="    document.getElementById('button').innerHTML=JSONobj.btn1;\n";
+  javaScript+="    document.getElementById('button1').innerHTML=JSONobj.btn2;\n";
+  javaScript+="    document.getElementById('button2').innerHTML=JSONobj.btn3;\n";
+  javaScript+="    document.getElementById('button3').innerHTML=JSONobj.btn4;\n";  
+  javaScript+="  }\n";
+  javaScript+="}\n";
+
+  javaScript+="function button(){\n";
+  javaScript+="  btn='btn1=ON';\n";
+  javaScript+="  if(document.getElementById('button').innerHTML==='ON')btn='btn1=OFF';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+
+  javaScript+="function button1(){\n";
+  javaScript+="  btn='btn2=A';\n";
+  javaScript+="  if(document.getElementById('button1').innerHTML==='A')btn='btn2=B';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+  
+  javaScript+="function button2(){\n";
+  javaScript+="  btn='btn3=UP!';\n";
+  javaScript+="  if(document.getElementById('button2').innerHTML==='UP!')btn='btn3=up';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+  
+  javaScript+="function button3(){\n";
+  javaScript+="  btn='btn4=DOWN!';\n";
+  javaScript+="  if(document.getElementById('button3').innerHTML==='DOWN!')btn='btn4=down';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+
+  javaScript+="function button2up(){\n";
+  javaScript+="  btn='btn3=up';\n";
+  javaScript+="  if(document.getElementById('button2').innerHTML==='up')btn='btn3=UP!';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+  
+  javaScript+="function button3up(){\n";
+  javaScript+="  btn='btn4=down';\n";
+  javaScript+="  if(document.getElementById('button3').innerHTML==='down')btn='btn4=DOWN!';\n";
+  javaScript+="  websock.send(btn);\n";
+  javaScript+="}\n";
+    
+  javaScript+="</SCRIPT>\n";
+}
+
+void handleWebsite(){
+  buildwebstranica();
+  server.send(200,"text/html",webstranica);
+}
+
+void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t wslength){
+  String payloadString=(const char *)payload;
+  //Serial.println("payload: '"+payloadString+"', channel: "+(String)num);
+  if(type==WStype_TEXT){
+    byte separator=payloadString.indexOf('=');
+    String var=payloadString.substring(0,separator);
+    String val=payloadString.substring(separator+1);
+
+    if(var=="btn1"){
+      btn1=false;
+      
+      if(val=="ON")btn1=true;
+      
+      
+    }
+    if(var=="btn2"){
+      btn2=false;
+      
+      if(val=="A")btn2=true;
+      
+      
+    }
+    if(var=="btn3"){
+      btn3=false;
+      
+      if(val=="UP!")btn3=true;
+      
+      
+    }
+    if(var=="btn4"){
+      btn4=false;
+      
+      if(val=="DOWN!")btn4=true;
+      
+      
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(9600); 
+  
+  WiFi.begin(ssid,password);
+  while(WiFi.status()!=WL_CONNECTED)delay(500);
+  WiFi.mode(WIFI_STA);
+ 
+  server.on("/",handleWebsite);
+  server.begin();
+  webSocket.begin();
+  webSocket.onEvent(webSocketEvent);
+  prviref='a';
+  prvichar='a';
+  drugiref='c';
+  drugichar='c';
+}
+
+void loop() {
+  webSocket.loop();
+  server.handleClient();
+  
+  aj = 'x';
+  delay(20);
+  
+  if(millis()>cekanje){
+    
+    String BTNSTR1="OFF";
+    String BTNSTR2="B";
+    String BTNSTR3="up";
+    String BTNSTR4="down";    
+    
+  if(btn1==true){
+    BTNSTR1="ON";    
+  }
+  if(btn2==true){
+    BTNSTR2="A";    
+  }
+  if(btn3==true){
+    BTNSTR3="UP!";
+    aj = 'e';
+  }
+  if(btn4==true){
+    BTNSTR4="DOWN!";
+    aj = 'f';
+  }
+
+  if(btn1){prvichar='b';}else{prvichar='a';}
+  if(btn2){drugichar='d';}else{drugichar='c';}
+
+  if(prviref!=prvichar){
+  aj=prvichar;  
+  Serial.write(aj);
+  delay(80);
+  prviref=prvichar;
+  }
+  if(drugiref!=drugichar){
+  aj=drugichar;
+  Serial.write(aj);
+  delay(80);
+  drugiref=drugichar;
+  }
+  Serial.write(aj);
+  
+    JSONsalji="{\"btn1\":\""+BTNSTR1+"\","+
+              "\"btn2\":\""+BTNSTR2+"\","+
+              "\"btn3\":\""+BTNSTR3+"\","+
+              "\"btn4\":\""+BTNSTR4+"\"}";
+    webSocket.broadcastTXT(JSONsalji);
+    cekanje=millis()+cekajmillis;
+  }
+}
